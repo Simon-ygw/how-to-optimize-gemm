@@ -6,7 +6,7 @@
 #define B(i, j)  b[(i) * ldb + (j)]
 #define C(i, j)  c[(i) * ldc + (j)]
 
-#define GEMM_M 256
+#define GEMM_M 1024
 #define GEMM_N 256
 #define GEMM_K 256
 
@@ -89,15 +89,15 @@ void Kernel_4x4(int m, int n, int k, float *sa, float *sb, float *sc, int ldc)
 
 void PackMatrixA_4(int m, int k, float *a, int lda, float *a_to)
 { 
-    float *a0_pntr = a;
-    float *a1_pntr = a + k;
-    float *a2_pntr = a + 2 * k;
-    float *a3_pntr = a + 3 * k;
+    float *a0_pntr, *a1_pntr, *a2_pntr, *a3_pntr;
 
     int ik = (k >> 2);
 
     for (int i = 0; i < m; i += 4) {
-
+        a0_pntr = a + i * lda;
+        a1_pntr = a0_pntr + lda;
+        a2_pntr = a1_pntr + lda;
+        a3_pntr = a2_pntr + lda;
         for (int j = 0; j < ik; j++) {
             *a_to++ = *a0_pntr++;
             *a_to++ = *a1_pntr++;
@@ -119,10 +119,6 @@ void PackMatrixA_4(int m, int k, float *a, int lda, float *a_to)
             *a_to++ = *a2_pntr++;
             *a_to++ = *a3_pntr++;
         }
-        a0_pntr += 3 * k;
-        a1_pntr += 3 * k;
-        a2_pntr += 3 * k;
-        a3_pntr += 3 * k;
     }
 }
 
@@ -135,9 +131,9 @@ void PackMatrixB_4(int k, int n, float *b, int ldb, float *b_to)
     for (int i = 0; i < in; i++) {
         btmp0 = b + (i << 2);
         for (int j = 0; j < ik; j++) {
-            btmp1 = btmp0 + n;
-            btmp2 = btmp0 + 2 * n;
-            btmp3 = btmp0 + 3 * n;
+            btmp1 = btmp0 + ldb;
+            btmp2 = btmp0 + 2 * ldb;
+            btmp3 = btmp0 + 3 * ldb;
 
             *b_to++ = *btmp0++;
             *b_to++ = *btmp0++;
@@ -159,7 +155,7 @@ void PackMatrixB_4(int k, int n, float *b, int ldb, float *b_to)
             *b_to++ = *btmp3++;
             *b_to++ = *btmp3++;
 
-            btmp0 += (4 * n - 4);
+            btmp0 += (4 * ldb - 4);
         }
     }
 }
@@ -173,7 +169,7 @@ void MY_MMult(int m, int n, int k, float *a, int lda, float *b, int ldb, float *
     float *packedA = (float*)aligned_alloc(64, m * k * sizeof(float));
     float *packedB = (float*)aligned_alloc(64, k * n * sizeof(float));
 
-    int minM, minN, minK;
+    int minM{GEMM_M}, minN{GEMM_N}, minK{GEMM_K};
 
     for (int i = 0; i < m; i += minM) {
         minM = std::min(GEMM_M, m - i);
@@ -183,14 +179,14 @@ void MY_MMult(int m, int n, int k, float *a, int lda, float *b, int ldb, float *
         
 
             minN = std::min(n, GEMM_N);
-            PackMatrixB_4(minK, minN, &B(0, 0), ldb, packedB);
+            PackMatrixB_4(minK, minN, b + p * ldb, ldb, packedB);
 
-            int minMM = 4;
+            int minMM = minM;
 
             for (int mms = i; mms < i + minM; mms += minMM) {
-                PackMatrixA_4(minMM, minK, a + mms * lda + p, lda, packedA + minK * (i - mms));
+                PackMatrixA_4(minMM, minK, a + mms * lda + p, lda, packedA + minK * (mms - i));
 
-                Kernel_4x4(minMM, minN, minK, packedA + minK * (i - mms), packedB, c + mms * ldc, ldc);
+                Kernel_4x4(minMM, minN, minK, packedA + minK * (mms - i), packedB, c + mms * ldc, ldc);
             }
 
             for (int ns = minN; ns < n; ns += minN) {

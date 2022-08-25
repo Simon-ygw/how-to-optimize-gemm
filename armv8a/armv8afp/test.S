@@ -2,7 +2,7 @@
 .align 5
 
 .global TEST
-
+TEST:
 .loop2:
     fmla v0.4s, v0.4s, v0.4s
     fmla v1.4s, v1.4s, v1.4s

@@ -2,8 +2,10 @@
 #define A(i, j)  a[(i) * lda + (j)]
 #define B(i, j)  b[(i) * ldb + (j)]
 #define C(i, j)  c[(i) * ldc + (j)]
-
+#include <algorithm>
 #include <arm_neon.h>
+
+
 
 void AddDot4x4(int k, float *a, int lda, float *b, int ldb, float *c, int ldc)
 {
@@ -33,6 +35,7 @@ void AddDot4x4(int k, float *a, int lda, float *b, int ldb, float *c, int ldc)
     vst1q_f32(&C(2, 0), c2_vreg);
     vst1q_f32(&C(3, 0), c3_vreg);
 }
+
 
 #define mc 256
 #define kc 128
